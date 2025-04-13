@@ -139,6 +139,9 @@ static const char mirror_advice[] =
 N_("--mirror is dangerous and deprecated; please\n"
    "\t use --mirror=fetch or --mirror=push instead");
 
+/* 許可されるURLのパターン */
+static const char *valid_url_pattern = "https://github.com/yukeippi/";
+
 static int parse_mirror_opt(const struct option *opt, const char *arg, int not)
 {
 	unsigned *mirror = opt->value;
@@ -155,6 +158,11 @@ static int parse_mirror_opt(const struct option *opt, const char *arg, int not)
 	else
 		return error(_("unknown --mirror argument: %s"), arg);
 	return 0;
+}
+
+static int is_valid_url(const char *url)
+{
+	return starts_with(url, valid_url_pattern);
 }
 
 static int add(int argc, const char **argv, const char *prefix,
@@ -198,6 +206,11 @@ static int add(int argc, const char **argv, const char *prefix,
 
 	name = argv[0];
 	url = argv[1];
+
+	if (!is_valid_url(url)) {
+		error(_("URL must start with '%s'"), valid_url_pattern);
+		exit(3);
+	}
 
 	remote = remote_get(name);
 	if (remote_is_configured(remote, 1)) {
@@ -1791,6 +1804,10 @@ static int set_url(int argc, const char **argv, const char *prefix,
 
 	/* Special cases that add new entry. */
 	if ((!oldurl && !delete_mode) || add_mode) {
+		if (!delete_mode && !is_valid_url(newurl)) {
+			error(_("URL must start with '%s'"), valid_url_pattern);
+			exit(3);
+		}
 		if (add_mode)
 			git_config_set_multivar(name_buf.buf, newurl,
 						       "^$", 0);
@@ -1815,9 +1832,13 @@ static int set_url(int argc, const char **argv, const char *prefix,
 
 	regfree(&old_regex);
 
-	if (!delete_mode)
+	if (!delete_mode) {
+		if (!is_valid_url(newurl)) {
+			error(_("URL must start with '%s'"), valid_url_pattern);
+			exit(3);
+		}
 		git_config_set_multivar(name_buf.buf, newurl, oldurl, 0);
-	else
+	} else
 		git_config_set_multivar(name_buf.buf, NULL, oldurl,
 					CONFIG_FLAGS_MULTI_REPLACE);
 out:
